@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Learn to Tell Time</title>
+  <style>
+    /* ── reset & base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #e0f0ff 0%, #fce4ec 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      color: #333;
+    }
+
+    h1 {
+      font-size: 2rem;
+      color: #1565c0;
+      margin-bottom: 6px;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      color: #555;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    /* ── mode toggle ── */
+    .mode-btns {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .mode-btn {
+      padding: 10px 28px;
+      border: none;
+      border-radius: 24px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+      background: #fff;
+      color: #1565c0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+    }
+
+    .mode-btn.active {
+      background: #1565c0;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(21,101,192,0.35);
+    }
+
+    /* ── card ── */
+    .card {
+      background: #fff;
+      border-radius: 24px;
+      padding: 32px 40px;
+      box-shadow: 0 6px 28px rgba(0,0,0,0.13);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      max-width: 480px;
+      width: 100%;
+    }
+
+    /* ── analog clock ── */
+    .clock-wrap {
+      position: relative;
+      width: 260px;
+      height: 260px;
+    }
+
+    svg#analog {
+      width: 260px;
+      height: 260px;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
+    }
+
+    /* ── digital display ── */
+    .digital {
+      font-size: 3rem;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: #1565c0;
+      background: #e8f0fe;
+      border-radius: 12px;
+      padding: 10px 28px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .digital .ampm {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #42a5f5;
+      margin-left: 6px;
+      vertical-align: super;
+    }
+
+    /* ── labels row ── */
+    .labels {
+      display: flex;
+      gap: 18px;
+      font-size: 0.9rem;
+      color: #555;
+    }
+
+    .label-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── practice mode ── */
+    #practice-section {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      width: 100%;
+    }
+
+    .instruction {
+      font-size: 1rem;
+      color: #555;
+      text-align: center;
+    }
+
+    .answer-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    #answer-input {
+      padding: 10px 16px;
+      border: 2px solid #90caf9;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      width: 140px;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    #answer-input:focus { border-color: #1565c0; }
+
+    .btn {
+      padding: 10px 22px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+
+    .btn-check {
+      background: #1565c0;
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(21,101,192,0.3);
+    }
+
+    .btn-check:hover { background: #0d47a1; }
+
+    .btn-new {
+      background: #e8f0fe;
+      color: #1565c0;
+    }
+
+    .btn-new:hover { background: #c5cae9; }
+
+    #feedback {
+      font-size: 1.1rem;
+      font-weight: 600;
+      min-height: 1.5em;
+      text-align: center;
+    }
+
+    .correct { color: #2e7d32; }
+    .wrong   { color: #c62828; }
+    .hint    { color: #e65100; font-size: 0.95rem; font-weight: 400; }
+
+    /* ── tip box ── */
+    .tip-box {
+      background: #fff9c4;
+      border-left: 4px solid #f9a825;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 0.9rem;
+      color: #5d4037;
+      line-height: 1.5;
+      max-width: 340px;
+      text-align: left;
+    }
+
+    .tip-box strong { color: #e65100; }
+
+    /* ── responsive ── */
+    @media (max-width: 480px) {
+      .card { padding: 24px 20px; }
+      .digital { font-size: 2.2rem; letter-spacing: 2px; }
+      svg#analog { width: 220px; height: 220px; }
+      .clock-wrap { width: 220px; height: 220px; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🕐 Learn to Tell Time</h1>
+  <p class="subtitle">Practice reading analog and digital clocks!</p>
+
+  <div class="mode-btns">
+    <button class="mode-btn active" id="btn-live" onclick="setMode('live')">Live Clock</button>
+    <button class="mode-btn"        id="btn-practice" onclick="setMode('practice')">Practice Mode</button>
+  </div>
+
+  <div class="card">
+
+    <!-- Analog clock -->
+    <div class="clock-wrap">
+      <svg id="analog" viewBox="0 0 200 200" aria-label="Analog clock">
+        <!-- face -->
+        <circle cx="100" cy="100" r="96" fill="#f8f9ff" stroke="#90caf9" stroke-width="4"/>
+        <!-- hour markers -->
+        <g id="hour-markers"></g>
+        <!-- minute markers -->
+        <g id="min-markers"></g>
+        <!-- hour numbers -->
+        <g id="hour-numbers"></g>
+        <!-- hands -->
+        <line id="hand-hour"   x1="100" y1="100" x2="100" y2="55"  stroke="#1565c0" stroke-width="6"  stroke-linecap="round"/>
+        <line id="hand-minute" x1="100" y1="100" x2="100" y2="35"  stroke="#42a5f5" stroke-width="4"  stroke-linecap="round"/>
+        <line id="hand-second" x1="100" y1="110" x2="100" y2="28"  stroke="#e53935" stroke-width="2"  stroke-linecap="round"/>
+        <!-- center dot -->
+        <circle cx="100" cy="100" r="5" fill="#1565c0"/>
+        <circle cx="100" cy="100" r="2" fill="#fff"/>
+      </svg>
+    </div>
+
+    <!-- Digital clock -->
+    <div class="digital" id="digital-display">
+      <span id="digital-time">12:00:00</span><span class="ampm" id="digital-ampm">AM</span>
+    </div>
+
+    <!-- Legend -->
+    <div class="labels">
+      <div class="label-box"><div class="dot" style="background:#1565c0"></div> Hour</div>
+      <div class="label-box"><div class="dot" style="background:#42a5f5"></div> Minute</div>
+      <div class="label-box"><div class="dot" style="background:#e53935"></div> Second</div>
+    </div>
+
+    <!-- Practice section -->
+    <div id="practice-section">
+      <p class="instruction">Look at the clock above. What time does it show?<br>
+        <small>(Enter time as <strong>H:MM</strong> or <strong>H:MM AM/PM</strong>, e.g. <em>3:45</em> or <em>3:45 PM</em>)</small>
+      </p>
+      <div class="answer-row">
+        <input id="answer-input" type="text" placeholder="e.g. 3:45" autocomplete="off" />
+        <button class="btn btn-check" onclick="checkAnswer()">Check ✓</button>
+        <button class="btn btn-new"   onclick="newPracticeTime()">New Time ↺</button>
+      </div>
+      <div id="feedback"></div>
+      <div class="tip-box" id="tip-box">
+        <strong>💡 Tip:</strong> The <strong>short hand</strong> points to the <strong>hour</strong>.
+        The <strong>long hand</strong> points to the <strong>minutes</strong> (multiply the number it points to by 5).
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    /* ── draw static clock decorations ── */
+    (function drawClockFace() {
+      const hourMarkersG = document.getElementById('hour-markers');
+      const minMarkersG  = document.getElementById('min-markers');
+      const numbersG     = document.getElementById('hour-numbers');
+      const cx = 100, cy = 100, r = 96;
+
+      for (let i = 0; i < 60; i++) {
+        const angle  = (i / 60) * 2 * Math.PI - Math.PI / 2;
+        const isHour = i % 5 === 0;
+        const outer  = r - 2;
+        const inner  = isHour ? outer - 10 : outer - 5;
+        const x1 = cx + outer * Math.cos(angle);
+        const y1 = cy + outer * Math.sin(angle);
+        const x2 = cx + inner * Math.cos(angle);
+        const y2 = cy + inner * Math.sin(angle);
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1.toFixed(2));
+        line.setAttribute('y1', y1.toFixed(2));
+        line.setAttribute('x2', x2.toFixed(2));
+        line.setAttribute('y2', y2.toFixed(2));
+        line.setAttribute('stroke', isHour ? '#1565c0' : '#90caf9');
+        line.setAttribute('stroke-width', isHour ? '2.5' : '1');
+        (isHour ? hourMarkersG : minMarkersG).appendChild(line);
+      }
+
+      for (let h = 1; h <= 12; h++) {
+        const angle = (h / 12) * 2 * Math.PI - Math.PI / 2;
+        const nr    = r - 22;
+        const x     = cx + nr * Math.cos(angle);
+        const y     = cy + nr * Math.sin(angle);
+        const text  = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', x.toFixed(2));
+        text.setAttribute('y', y.toFixed(2));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'central');
+        text.setAttribute('font-size', '13');
+        text.setAttribute('font-weight', '600');
+        text.setAttribute('fill', '#1a237e');
+        text.textContent = h;
+        numbersG.appendChild(text);
+      }
+    })();
+
+    /* ── hand rotation helper ── */
+    function rotateLine(id, angleDeg, originX, originY) {
+      document.getElementById(id)
+        .setAttribute('transform', `rotate(${angleDeg.toFixed(4)},${originX},${originY})`);
+    }
+
+    /* ── mode state ── */
+    let mode = 'live';          // 'live' | 'practice'
+    let practiceH = 3;          // hour   1-12
+    let practiceM = 45;         // minute 0-59
+    let practiceAmpm = 'PM';
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('btn-live').classList.toggle('active', m === 'live');
+      document.getElementById('btn-practice').classList.toggle('active', m === 'practice');
+      const ps = document.getElementById('practice-section');
+      ps.style.display = m === 'practice' ? 'flex' : 'none';
+      if (m === 'practice') {
+        newPracticeTime();
+      }
+    }
+
+    /* ── generate a new random practice time ── */
+    function newPracticeTime() {
+      practiceH    = Math.floor(Math.random() * 12) + 1;      // 1-12
+      practiceM    = Math.floor(Math.random() * 12) * 5;      // multiples of 5: 0-55
+      practiceAmpm = Math.random() < 0.5 ? 'AM' : 'PM';
+      document.getElementById('answer-input').value = '';
+      document.getElementById('feedback').textContent = '';
+      updateDisplay(practiceH, practiceM, 0, practiceAmpm);
+    }
+
+    /* ── update the SVG hands and digital display ── */
+    function updateDisplay(h12, min, sec, ampm) {
+      // hour hand: 360/12 per hour + fraction for minutes
+      const hourAngle   = (h12 % 12) * 30 + min * 0.5;
+      // minute hand: 360/60 per minute + fraction for seconds
+      const minuteAngle = min * 6 + sec * 0.1;
+      // second hand: 360/60 per second
+      const secondAngle = sec * 6;
+
+      rotateLine('hand-hour',   hourAngle,   100, 100);
+      rotateLine('hand-minute', minuteAngle, 100, 100);
+      rotateLine('hand-second', secondAngle, 100, 100);
+
+      // digital
+      const hd = String(h12).padStart(2, '0');
+      const md = String(min).padStart(2, '0');
+      const sd = String(sec).padStart(2, '0');
+      document.getElementById('digital-time').textContent = `${hd}:${md}:${sd}`;
+      document.getElementById('digital-ampm').textContent = ampm;
+    }
+
+    /* ── live clock tick ── */
+    function tick() {
+      if (mode !== 'live') return;
+      const now   = new Date();
+      let   h24   = now.getHours();
+      const min   = now.getMinutes();
+      const sec   = now.getSeconds();
+      const ampm  = h24 < 12 ? 'AM' : 'PM';
+      let   h12   = h24 % 12;
+      if (h12 === 0) h12 = 12;
+      updateDisplay(h12, min, sec, ampm);
+    }
+
+    tick();
+    setInterval(tick, 1000);
+
+    /* ── answer checking ── */
+    function checkAnswer() {
+      const raw = document.getElementById('answer-input').value.trim();
+      const fb  = document.getElementById('feedback');
+
+      if (!raw) {
+        fb.textContent = 'Please enter a time first.';
+        fb.className   = 'hint';
+        return;
+      }
+
+      // parse input: accept "H:MM", "HH:MM", optionally " AM"/" PM" suffix
+      const match = raw.match(/^(\d{1,2}):(\d{2})(?:\s*(am|pm))?$/i);
+      if (!match) {
+        fb.textContent = 'Format not recognised. Try "3:45" or "3:45 PM".';
+        fb.className   = 'hint';
+        return;
+      }
+
+      const inputH    = parseInt(match[1], 10);
+      const inputM    = parseInt(match[2], 10);
+      const inputAmpm = match[3] ? match[3].toUpperCase() : null;
+
+      let correct = (inputH === practiceH && inputM === practiceM);
+
+      // if user supplied AM/PM, check it too; otherwise ignore it
+      if (correct && inputAmpm) {
+        correct = (inputAmpm === practiceAmpm);
+      }
+
+      if (correct) {
+        fb.innerHTML = '🎉 Correct! Well done!';
+        fb.className = 'correct';
+      } else {
+        const correctStr = `${practiceH}:${String(practiceM).padStart(2,'0')} ${practiceAmpm}`;
+        fb.innerHTML = `❌ Not quite. The answer is <strong>${correctStr}</strong>. Try again!`;
+        fb.className = 'wrong';
+      }
+    }
+
+    /* allow pressing Enter in the input to check */
+    document.getElementById('answer-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') checkAnswer();
+    });
+  </script>
+</body>
+</html>
