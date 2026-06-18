@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Time Lab & 8-Clock Worksheet Generator</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #f8fafc; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); padding: 20px; color: #1e293b; }
+        
+        .controls { 
+            background: white; padding: 25px; border-radius: 12px; 
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); 
+            max-width: 1000px; margin: 0 auto 30px; text-align: left;
+        }
+        .settings-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        
+        /* Online Grid Layout */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .clock-card { background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; text-align: center; }
+        
+        .digital-display { font-family: monospace; font-size: 1.8rem; background: #0f172a; color: #10b981; padding: 8px; border-radius: 6px; margin-bottom: 10px; display: inline-block; }
+        canvas { cursor: crosshair; touch-action: none; background: #fff; border-radius: 50%; max-width: 100%; height: auto; }
+        select, input { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; width: 100%; box-sizing: border-box; }
+        
+        button { background: var(--primary); color: white; border: none; padding: 12px 15px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: opacity 0.2s; }
+        button:hover { opacity: 0.9; }
+        .btn-print { background: #64748b; }
+        .btn-check { background: #059669; }
+
+        .feedback { margin-top: 8px; font-weight: 700; font-size: 0.85rem; height: 1.2em; }
+
+        /* --- PRINT LOGIC --- */
+        @media print {
+            @page { margin: 0.5cm; size: portrait; }
+            .controls, button, .feedback { display: none !important; }
+            body { background: white; padding: 0; margin: 0; }
+            
+            /* Force exactly 2 columns for the 8-clock layout */
+            .grid { 
+                display: grid !important; 
+                grid-template-columns: 1fr 1fr !important; 
+                gap: 10px !important;
+                max-width: 100% !important;
+            }
+            
+            .clock-card { 
+                border: 1px solid #ccc !important; 
+                border-radius: 0 !important; 
+                padding: 10px !important;
+                page-break-inside: avoid;
+                height: 240px; /* Helps keep 4 rows on one page */
+            }
+
+            .digital-display { 
+                background: white !important; 
+                color: black !important; 
+                border: 1.5px solid black !important; 
+                font-size: 1.5rem !important;
+            }
+
+            canvas { width: 180px !important; height: 180px !important; }
+            
+            input { 
+                border: none !important; 
+                border-bottom: 1px solid black !important; 
+                border-radius: 0 !important; 
+                width: 60px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="controls">
+    <h2 style="margin-top:0; color:var(--primary)">Time Lab Generator</h2>
+    <div class="settings-bar">
+        <div>
+            <label><strong>Mode</strong></label>
+            <select id="mode">
+                <option value="digital">Set Hands (Digital Question)</option>
+                <option value="analog" selected>Type Time (Analog Question)</option>
+            </select>
+        </div>
+        <div>
+            <label><strong>Intervals</strong></label>
+            <select id="interval">
+                <option value="60">1 Hour</option>
+                <option value="30">30 Mins</option>
+                <option value="15">15 Mins</option>
+                <option value="5">5 Mins</option>
+                <option value="1">Open (1 Min)</option>
+            </select>
+        </div>
+        <div>
+            <label><strong>Questions</strong></label>
+            <input type="number" id="count" value="8" min="1" max="24">
+        </div>
+        <div style="display:flex; align-items:flex-end; gap:8px">
+            <button onclick="generate()">Generate</button>
+            <button class="btn-check" onclick="checkAll()">Check Online</button>
+            <button class="btn-print" onclick="prepareAndPrint()">Print Worksheet</button>
+        </div>
+    </div>
+    <p style="margin:0; font-size:0.8rem; color:#64748b">Tip: Set "Questions" to 8 for a perfect single-page layout.</p>
+</div>
+
+<div id="worksheet" class="grid"></div>
+
+<script>
+    let activeClocks = [];
+    let isPrinting = false;
+
+    class InteractiveClock {
+        constructor(id, h, m, mode) {
+            this.id = id;
+            this.targetH = h;
+            this.targetM = m;
+            this.mode = mode;
+            this.userH = mode === 'digital' ? 12 : h;
+            this.userM = mode === 'digital' ? 0 : m;
+            this.isDraggingM = false;
+            this.isDraggingH = false;
+        }
+
+        render() {
+            const canvas = document.getElementById(`c${this.id}`);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, 250, 250);
+            ctx.save();
+            ctx.translate(125, 125);
+
+            // Clock Face
+            ctx.beginPath();
+            ctx.arc(0, 0, 110, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Ticks
+            for (let i = 0; i < 60; i++) {
+                ctx.beginPath();
+                ctx.lineWidth = i % 5 === 0 ? 2 : 1;
+                ctx.moveTo(0, -110);
+                ctx.lineTo(0, i % 5 === 0 ? -100 : -105);
+                ctx.stroke();
+                ctx.rotate(Math.PI / 30);
+            }
+
+            // Numbers
+            ctx.font = "bold 20px sans-serif";
+            ctx.fillStyle = "#000";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            for (let i = 1; i <= 12; i++) {
+                const ang = i * Math.PI / 6;
+                ctx.fillText(i, Math.sin(ang) * 82, -Math.cos(ang) * 82);
+            }
+
+            // Hide hands if printing a "Set Hands" worksheet
+            const shouldHideHands = isPrinting && this.mode === 'digital';
+
+            if (!shouldHideHands) {
+                const mAng = (this.userM * 6) * Math.PI / 180;
+                const hAng = (this.userH * 30 + (this.userM / 60) * 30) * Math.PI / 180;
+                
+                // Minute Hand
+                this.drawHand(ctx, mAng, 95, 3, '#00f'); 
+                // Hour Hand
+                this.drawHand(ctx, hAng, 65, 6, '#000'); 
+            }
+
+            ctx.restore();
+        }
+
+        drawHand(ctx, ang, len, width, color) {
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.lineCap = 'round';
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.sin(ang) * len, -Math.cos(ang) * len);
+            ctx.stroke();
+
+            if (this.mode === 'digital' && !isPrinting) {
+                ctx.beginPath();
+                ctx.arc(Math.sin(ang) * len, -Math.cos(ang) * len, 7, 0, 2 * Math.PI);
+                ctx.fillStyle = color;
+                ctx.fill();
+            }
+        }
+
+        handleInput(x, y) {
+            const angle = (Math.atan2(y, x) * 180 / Math.PI) + 90;
+            const normAngle = angle < 0 ? angle + 360 : angle;
+            if (this.isDraggingM) {
+                this.userM = Math.round(normAngle / 6) % 60;
+            } else if (this.isDraggingH) {
+                this.userH = (normAngle / 30);
+            }
+            this.render();
+        }
+    }
+
+    function generate() {
+        const container = document.getElementById('worksheet');
+        const count = document.getElementById('count').value;
+        const mode = document.getElementById('mode').value;
+        const interval = parseInt(document.getElementById('interval').value);
+        container.innerHTML = '';
+        activeClocks = [];
+
+        for (let i = 0; i < count; i++) {
+            const h = Math.floor(Math.random() * 12) + 1;
+            const m = Math.floor(Math.random() * (60 / (interval || 1))) * (interval || 1);
+            const clock = new InteractiveClock(i, h, m, mode);
+            activeClocks.push(clock);
+
+            const card = document.createElement('div');
+            card.className = 'clock-card';
+            
+            if (mode === 'digital') {
+                card.innerHTML = `
+                    <div class="digital-display">${h}:${m.toString().padStart(2, '0')}</div>
+                    <canvas id="c${i}" width="250" height="250"></canvas>
+                    <div id="fb${i}" class="feedback"></div>
+                `;
+            } else {
+                card.innerHTML = `
+                    <canvas id="c${i}" width="250" height="250"></canvas>
+                    <div style="margin-top:10px">
+                        <strong>Time:</strong> <input type="text" id="ans${i}">
+                    </div>
+                    <div id="fb${i}" class="feedback"></div>
+                `;
+            }
+            container.appendChild(card);
+            clock.render();
+
+            const canvas = document.getElementById(`c${i}`);
+            canvas.onmousedown = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left) * (250 / rect.width) - 125;
+                const y = (e.clientY - rect.top) * (250 / rect.height) - 125;
+                const dist = Math.sqrt(x*x + y*y);
+                if (dist > 75) clock.isDraggingM = true;
+                else if (dist > 20) clock.isDraggingH = true;
+            };
+        }
+    }
+
+    function prepareAndPrint() {
+        isPrinting = true;
+        activeClocks.forEach(c => c.render());
+        setTimeout(() => {
+            window.print();
+            isPrinting = false;
+            activeClocks.forEach(c => c.render());
+        }, 100);
+    }
+
+    window.onmousemove = (e) => {
+        activeClocks.forEach(clock => {
+            if (clock.isDraggingM || clock.isDraggingH) {
+                const canvas = document.getElementById(`c${clock.id}`);
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left) * (250 / rect.width) - 125;
+                const y = (e.clientY - rect.top) * (250 / rect.height) - 125;
+                clock.handleInput(x, y);
+            }
+        });
+    };
+
+    window.onmouseup = () => activeClocks.forEach(c => c.isDraggingM = c.isDraggingH = false);
+
+    function checkAll() {
+        activeClocks.forEach((c, i) => {
+            const fb = document.getElementById(`fb${i}`);
+            if (c.mode === 'digital') {
+                const hMatch = Math.abs((c.userH % 12) - (c.targetH % 12)) < 0.4;
+                const mMatch = c.userM === c.targetM;
+                fb.innerHTML = (hMatch && mMatch) ? "✅ Correct!" : "❌ Keep trying!";
+                fb.style.color = (hMatch && mMatch) ? "#059669" : "#dc2626";
+            } else {
+                const input = document.getElementById(`ans${i}`).value.trim();
+                const target = `${c.targetH}:${c.targetM.toString().padStart(2, '0')}`;
+                const isCorrect = (input === target || input === `0${target}`);
+                fb.innerHTML = isCorrect ? "✅ Correct!" : `❌ It is ${target}`;
+                fb.style.color = isCorrect ? "#059669" : "#dc2626";
+            }
+        });
+    }
+
+    generate();
+</script>
+</body>
+</html>
